@@ -135,12 +135,23 @@ class Sia extends \OC\Files\Storage\Common {
 		}
 	}
 
+	// directorySize returns the aggregate filesize of every file in the directory supplied by $path.
+	private function directorySize($path) {
+		$files = $this->client->renterFiles();
+		$sz = 0;
+		foreach($files as $file) {
+			if (strpos($file->siapath, $path) !== false) {
+				$sz += $file->filesize;
+			}
+		}
+		return $sz;
+	}
+
 	public function stat($path) {
 		clearstatcache();
 		$ret = array();
 		if ($this->is_dir($path)) {
-			// TODO: implement directory filesize counting 
-			$stat['size'] = -1;
+			$ret['size'] = $this->directorySize($path);
 			return $ret;
 		}
 
@@ -196,6 +207,10 @@ class Sia extends \OC\Files\Storage\Common {
 
 	// filesize returns the file size in bytes of the file at $path.
 	public function filesize($path) {
+		if ($this->is_dir($path)) {
+			return $this->directorySize($path);
+		}
+		
 		$sz = 0;
 		$siafiles = $this->client->renterFiles();
 
