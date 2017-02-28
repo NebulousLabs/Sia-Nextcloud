@@ -275,11 +275,6 @@ class Sia extends \OC\Files\Storage\Common {
 		return true;
 	}
 
-	public function copy($path1, $path2) {
-		throw new \Exception('copy');
-		return false;
-	}
-
 	public function fopen($path, $mode) {
 		switch ($mode) {
 			case 'r':
