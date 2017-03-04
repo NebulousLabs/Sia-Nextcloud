@@ -7,3 +7,4 @@ This is the [Nextcloud](https://nextcloud.com/) Sia storage backend implementati
 This requires one parameter to work, an API Address. This API Address must point to a reachable, synchronized Sia node that has money set aside in an allowance.
 
 
+

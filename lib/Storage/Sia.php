@@ -102,13 +102,19 @@ class Sia extends \OC\Files\Storage\Common {
 	}
 
 	public function rmdir($path) {
-		$i = 0;
-		foreach($this->files as $file) {
-			if ($file == $path) {
-				unset($this->files[i]);
-			}
-			$i++;
+		if ($path == "") {
+			return false;
 		}
+
+		$files = $this->client->renterFiles();
+
+		foreach ($files as $file) {
+			if (strpos($file->siapath, $path) === 0) {
+				$this->client->delete($file->siapath);
+			}
+		}
+
+		return true;
 	}
 
 	public function opendir($path) {
@@ -327,7 +333,6 @@ class Sia extends \OC\Files\Storage\Common {
 		}
 	}
 
-	// TODO
 	public function hasUpdated($path, $time) {
 		return true;
 	}

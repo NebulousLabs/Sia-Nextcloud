@@ -34,7 +34,7 @@ class Sia extends Backend {
 	public function __construct(IL10N $l, NullMechanism $legacyAuth) {
 		$this
 			->setIdentifier('sia')
-			->setStorageClass('\OCA\Files_External_Sia\Storage\Sia')
+			->setStorageClass(\OCA\Files_External_Sia\Storage\Sia::class)
 			->setText($l->t('Sia'))
 			->addParameters([
 				(new DefinitionParameter('apiaddr', $l->t('API Address'))),
