@@ -2,14 +2,16 @@
 <info>
 	<id>files_external_sia</id>
 	<name>Sia storage support</name>
-	<description>Sia support for files_external. This app adds a dropdown for Sia, a decentralized storage network, to the files_external app. A running, correctly configured Sia node is required for this app.</description>
+	<description>Sia support for files_external. This app adds a dropdown for Sia, a decentralized storage network, to the files_external app.</description>
 	<licence>AGPL</licence>
 	<author>Nebulous Labs</author>
 	<version>0.1.0</version>
-	<screenshot>https://sia.tech//img/siainfo3.png</screenshot>
 	<documentation>
 		<user>https://github.com/NebulousLabs/Sia-Nextcloud</user>
 	</documentation>
+	<bugs>https://github.com/NebulousLabs/Sia-Nextcloud/issues</bugs>
+	<repository>https://github.com/NebulousLabs/Sia-Nextcloud</repository>
+	<screenshot>https://sia.tech//img/siainfo3.png</screenshot>	
 	<types>
 		<filesystem/>
 	</types>
