@@ -38,7 +38,7 @@ class Sia extends Backend {
 			->setText($l->t('Sia'))
 			->addParameters([
 				(new DefinitionParameter('apiaddr', $l->t('API Address'))),
-				(new DefinitionParameter('datadir', $l->t('Renter Data Directory')),
+				(new DefinitionParameter('datadir', $l->t('Renter Data Directory'))),
 			])
 			->setAllowedVisibility(BackendService::VISIBILITY_ADMIN)
 			->setPriority(BackendService::PRIORITY_DEFAULT + 50)
