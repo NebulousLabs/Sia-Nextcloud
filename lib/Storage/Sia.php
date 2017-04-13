@@ -43,7 +43,7 @@ class Sia extends \OC\Files\Storage\Common {
 		}
 		$this->client = new \Sia\Client($arguments['apiaddr']);
 		$this->apiaddr = $arguments['apiaddr'];
-		$this->datadir = $arguments['datadir'];
+		$this->datadir = realpath($arguments['datadir']);
 	}
 
 	// parsePaths takes an array of siafiles and a path and returns an array of
@@ -320,7 +320,7 @@ class Sia extends \OC\Files\Storage\Common {
 			case 'x+':
 			case 'c':
 			case 'c+':
-				$localfile = $this->datadir . basename($path);
+				$localfile = $this->datadir . '/' . basename($path);
 				$handle = fopen($localfile, $mode);
 				return CallbackWrapper::wrap($handle, null, null, function () use ($path, $localfile) {
 					$this->client->upload($path, $localfile);
