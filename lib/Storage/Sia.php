@@ -34,6 +34,7 @@ use Icewind\Streams\CallbackWrapper;
 class Sia extends \OC\Files\Storage\Common {
 	private $client;
 	private $apiaddr;
+	private $datadir
 
 
 	public function __construct($arguments) {
@@ -42,6 +43,7 @@ class Sia extends \OC\Files\Storage\Common {
 		}
 		$this->client = new \Sia\Client($arguments['apiaddr']);
 		$this->apiaddr = $arguments['apiaddr'];
+		$this->datadir = $arguments['datadir'];
 	}
 
 	// parsePaths takes an array of siafiles and a path and returns an array of
@@ -128,11 +130,14 @@ class Sia extends \OC\Files\Storage\Common {
 	}
 
 	// test the node's upload capability by verifying that the node has some
-	// contracts.
+	// contracts and the renter data directory is writeable.
 	public function test() {
 		try {
 			$contracts = $this->client->renterContracts();
 			if (count($contracts) === 0) {
+				return false;
+			}
+			if (!is_writeable($this->datadir)) {
 				return false;
 			}
 			return true;
