@@ -1,6 +1,6 @@
 <?php
 /**
- * @copyright Copyright (c) 2016, ownCloud, Inc.
+ * @copyright Copyright (c) 2016, Nebulous, Inc.
  *
  * @author Johnathan Howell <me@johnathanhowell.com>
  *
@@ -82,6 +82,17 @@ class Sia extends \OC\Files\Storage\Common {
 		}
 	
 		return array_values($ret);
+	}
+
+	// localFile takes a $siapath and returns the location of the file on disk.
+	// Temporary files ('.octransfer*') will have the same hash as their final
+	// forms.
+	private function localFile($siapath) {
+		$cleanpath = $siapath;
+		if (strpos($siapath, '.ocTransferId') !== false) {
+			$cleanpath = explode('.ocTransferId', $siapath)[0];
+		}
+		return $this->datadir . '/' . hash('sha256', $cleanpath);
 	}
 
 	public function __destruct() {
@@ -205,15 +216,12 @@ class Sia extends \OC\Files\Storage\Common {
 	}
 
 	public function is_file($path) {
-		$files = $this->client->renterFiles();
-
-		foreach($files as $file) {
-			if ($file->siapath === $path) {
-				return true;
-			}
+		$file = $this->fileAtSiapath($path);
+		if (!$file) {
+			return false;
 		}
 
-		return false;
+		return true;
 	}
 
 	// filesize returns the file size in bytes of the file at $path.
@@ -223,16 +231,12 @@ class Sia extends \OC\Files\Storage\Common {
 		}
 		
 		$sz = 0;
-		$siafiles = $this->client->renterFiles();
-
-		foreach($siafiles as $siafile) {
-			if ($siafile->siapath === $path) {
-				$sz = $siafile->filesize;
-				break;
-			}
+		$file = $this->fileAtSiapath($path);
+		if (!$file) {
+			return false;
 		}
 
-		return $sz;
+		return $file->filesize;
 	}
 
 	public function isDeletable($path) {
@@ -267,6 +271,9 @@ class Sia extends \OC\Files\Storage\Common {
 	public function unlink($path) {
 		try {
 			$this->client->delete($path);
+			if (file_exists($this->localFile($path))) {
+				unlink($this->localFile($path));
+			}
 		} catch (\Exception $e) {
 			return false;
 		}
@@ -286,28 +293,64 @@ class Sia extends \OC\Files\Storage\Common {
 		return true;
 	}
 
+	// isFileInDownloads returns a bool true if a file exists in the Sia node's
+	// downloads, otherwise it returns false.
+	private function isFileInDownloads($siapath) {
+		$exists = false;
+
+		$downloads = $this->client->downloads();
+		foreach($downloads as $download) {
+			if ($download->siapath == $siapath && $download->error == "") {
+				$exists = true;
+			}
+		}
+
+		return $exists;
+	}
+
+	// fileAtSiapath returns the file object at the requested siapath, if it
+	// exists.
+	private function fileAtSiapath($siapath) {
+		$files = $this->client->renterFiles();
+		foreach ($files as $file) {
+			if ($file->siapath == $siapath) {
+				return $file;
+			}
+		}
+		return false;
+	}
+
+	// nodeHasFile returns true if this node has a valid copy of the supplied
+	// siapath.
+	private function nodeHasFile($siapath) {
+		$file = $this->fileAtSiapath($siapath);
+		if (!$file) {
+			return false;
+		}
+
+		if (file_exists($this->localFile($siapath))) {
+			return filesize($this->localFile($siapath)) == $file->filesize;
+		}
+
+		return false;
+	}
+
 	public function fopen($path, $mode) {
 		switch ($mode) {
 			case 'r':
 			case 'rb':
-				$ext = pathinfo($path)['extension'];
-				$tmpFile = \OCP\Files::tmpFile($ext);
-
-				$this->client->download($path, $tmpFile);
-
-				$hasDownloaded = false;
-				while (!$hasDownloaded) {
-					sleep(1);
-					$downloads = $this->client->downloads();
-					foreach($downloads as $download) {
-						if ($download->destination == $tmpFile && $download->received == $download->filesize) {
-							$hasDownloaded = true;
-							break;
-						}
-					}
+				// if this file is on disk, just return a handle to it
+				if ($this->nodeHasFile($path))  {
+					return fopen($this->localFile($path), 'r');
 				}
 
-				return fopen($tmpFile, 'r');
+				// if this file hasn't been downloaded already, download it and return
+				// a file informing the user what is happening.
+				if (!$this->isFileInDownloads($path)) {
+					$this->client->download($path, $this->localFile($path));
+				}
+
+				return fopen('data://text/plain,' . $path . ' is currently being downloaded from Sia.', $mode);
 			case 'w':
 			case 'wb':
 			case 'a':
@@ -320,7 +363,7 @@ class Sia extends \OC\Files\Storage\Common {
 			case 'x+':
 			case 'c':
 			case 'c+':
-				$localfile = $this->datadir . '/' . basename($path);
+				$localfile = $this->localFile($path);
 				$handle = fopen($localfile, $mode);
 				return CallbackWrapper::wrap($handle, null, null, function () use ($path, $localfile) {
 					$this->client->upload($path, $localfile);
