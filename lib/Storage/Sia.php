@@ -10,6 +10,7 @@
  * it under the terms of the GNU Affero General Public License, version 3,
  * as published by the Free Software Foundation.
  * This program is distributed in the hope that it will be useful,
+ *
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
@@ -212,15 +213,12 @@ class Sia extends \OC\Files\Storage\Common {
 	}
 
 	public function is_file($path) {
-		$files = $this->client->renterFiles();
-
-		foreach($files as $file) {
-			if ($file->siapath === $path) {
-				return true;
-			}
+		$file = $this->fileAtSiapath($path);
+		if (!$file) {
+			return false;
 		}
 
-		return false;
+		return true;
 	}
 
 	// filesize returns the file size in bytes of the file at $path.
@@ -230,16 +228,12 @@ class Sia extends \OC\Files\Storage\Common {
 		}
 		
 		$sz = 0;
-		$siafiles = $this->client->renterFiles();
-
-		foreach($siafiles as $siafile) {
-			if ($siafile->siapath === $path) {
-				$sz = $siafile->filesize;
-				break;
-			}
+		$file = $this->fileAtSiapath($path);
+		if (!$file) {
+			return false;
 		}
 
-		return $sz;
+		return $file->filesize;
 	}
 
 	public function isDeletable($path) {
@@ -311,49 +305,31 @@ class Sia extends \OC\Files\Storage\Common {
 		return $exists;
 	}
 
-	// waitUntilDownloaded spins until the requested file at $siapath has been
-	// downloaded, and returns a handle to the downloaded file on disk.
-	private function waitUntilDownloaded($siapath) {
-		// if this file doesnt exist yet in downloads, spin for up to 20 seconds
-		// until it appears.
-		if (!$this->isFileInDownloads($siapath)) {
-			$i = 0;
-			$exists = false;
-			while (!$exists) {
-				if ($i == 20) {
-					throw new \Exception($siapath . ' did not appear in downloads after 20 seconds.');
-				}
-				sleep(1);
-				$downloads = $this->client->downloads();
-				foreach($downloads as $download) {
-					if ($download->siapath == $siapath) {
-						$exists = true;
-						break;
-					}
-				}
-				$i++;
+	// fileAtSiapath returns the file object at the requested siapath, if it
+	// exists.
+	private function fileAtSiapath($siapath) {
+		$files = $this->client->renterFiles();
+		foreach ($files as $file) {
+			if ($file->siapath == $siapath) {
+				return $file;
 			}
 		}
+		return false;
+	}
 
-		// spin until the file has been downloaded.
-		$localPath = '';
-		$exists = false;
-		while (!$exists) {
-			sleep(1);
-			$downloads = $this->client->downloads();
-			foreach($downloads as $download) {
-				if ($download->siapath == $siapath && $download->error !== "") {
-					throw new \Exception($download->error);
-				}
-				if ($download->siapath == $siapath && $download->received == $download->filesize) {
-					$localPath = $download->destination;
-					$exists = true;
-					break;
-				}
-			}
+	// nodeHasFile returns true if this node has a valid copy of the supplied
+	// siapath.
+	private function nodeHasFile($siapath) {
+		$file = $this->fileAtSiapath($siapath);
+		if (!$file) {
+			return false;
 		}
 
-		return fopen($localPath, 'r');
+		if (file_exists($this->localFile($siapath))) {
+			return filesize($this->localFile($siapath)) == $file->filesize;
+		}
+
+		return false;
 	}
 
 	public function fopen($path, $mode) {
@@ -361,17 +337,17 @@ class Sia extends \OC\Files\Storage\Common {
 			case 'r':
 			case 'rb':
 				// if this file is on disk, just return a handle to it
-				if (file_exists($this->localFile($path))) {
+				if ($this->nodeHasFile($path))  {
 					return fopen($this->localFile($path), 'r');
 				}
 
 				// if this file hasn't been downloaded already, download it and return
-				// the file handle.
+				// a file informing the user what is happening.
 				if (!$this->isFileInDownloads($path)) {
 					$this->client->download($path, $this->localFile($path));
 				}
 
-				return $this->waitUntilDownloaded($path);
+				return fopen('data://text/plain,' . $path . ' is currently being downloaded from Sia.', $mode);
 			case 'w':
 			case 'wb':
 			case 'a':
@@ -388,14 +364,6 @@ class Sia extends \OC\Files\Storage\Common {
 				$handle = fopen($localfile, $mode);
 				return CallbackWrapper::wrap($handle, null, null, function () use ($path, $localfile) {
 					$this->client->upload($path, $localfile);
-					while (true) {
-						$files = $this->client->renterFiles();
-						foreach ($files as $file) {
-							if ($file->siapath == $path) {
-								return;
-							}
-						}
-					}
 				});
 		}
 	}
