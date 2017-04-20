@@ -9,8 +9,7 @@
  * This code is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
  * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
+ * * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
@@ -82,6 +81,14 @@ class Sia extends \OC\Files\Storage\Common {
 		}
 	
 		return array_values($ret);
+	}
+
+	private function localFile($siapath) {
+		$cleanpath = $siapath;
+		if (strpos($siapath, '.ocTransferId') !== false) {
+			$cleanpath = explode('.ocTransferId', $siapath)[0];
+		}
+		return $this->datadir . '/' . hash('sha256', $cleanpath);
 	}
 
 	public function __destruct() {
@@ -267,6 +274,9 @@ class Sia extends \OC\Files\Storage\Common {
 	public function unlink($path) {
 		try {
 			$this->client->delete($path);
+			if (file_exists($this->localFile($path))) {
+				unlink($this->localFile($path));
+			}
 		} catch (\Exception $e) {
 			return false;
 		}
@@ -286,28 +296,82 @@ class Sia extends \OC\Files\Storage\Common {
 		return true;
 	}
 
+	// isFileInDownloads returns a bool true if a file exists in the Sia node's
+	// downloads, otherwise it returns false.
+	private function isFileInDownloads($siapath) {
+		$exists = false;
+
+		$downloads = $this->client->downloads();
+		foreach($downloads as $download) {
+			if ($download->siapath == $siapath && $download->error == "") {
+				$exists = true;
+			}
+		}
+
+		return $exists;
+	}
+
+	// waitUntilDownloaded spins until the requested file at $siapath has been
+	// downloaded, and returns a handle to the downloaded file on disk.
+	private function waitUntilDownloaded($siapath) {
+		// if this file doesnt exist yet in downloads, spin for up to 20 seconds
+		// until it appears.
+		if (!$this->isFileInDownloads($siapath)) {
+			$i = 0;
+			$exists = false;
+			while (!$exists) {
+				if ($i == 20) {
+					throw new \Exception($siapath . ' did not appear in downloads after 20 seconds.');
+				}
+				sleep(1);
+				$downloads = $this->client->downloads();
+				foreach($downloads as $download) {
+					if ($download->siapath == $siapath) {
+						$exists = true;
+						break;
+					}
+				}
+				$i++;
+			}
+		}
+
+		// spin until the file has been downloaded.
+		$localPath = '';
+		$exists = false;
+		while (!$exists) {
+			sleep(1);
+			$downloads = $this->client->downloads();
+			foreach($downloads as $download) {
+				if ($download->siapath == $siapath && $download->error !== "") {
+					throw new \Exception($download->error);
+				}
+				if ($download->siapath == $siapath && $download->received == $download->filesize) {
+					$localPath = $download->destination;
+					$exists = true;
+					break;
+				}
+			}
+		}
+
+		return fopen($localPath, 'r');
+	}
+
 	public function fopen($path, $mode) {
 		switch ($mode) {
 			case 'r':
 			case 'rb':
-				$ext = pathinfo($path)['extension'];
-				$tmpFile = \OCP\Files::tmpFile($ext);
-
-				$this->client->download($path, $tmpFile);
-
-				$hasDownloaded = false;
-				while (!$hasDownloaded) {
-					sleep(1);
-					$downloads = $this->client->downloads();
-					foreach($downloads as $download) {
-						if ($download->destination == $tmpFile && $download->received == $download->filesize) {
-							$hasDownloaded = true;
-							break;
-						}
-					}
+				// if this file is on disk, just return a handle to it
+				if (file_exists($this->localFile($path))) {
+					return fopen($this->localFile($path), 'r');
 				}
 
-				return fopen($tmpFile, 'r');
+				// if this file hasn't been downloaded already, download it and return
+				// the file handle.
+				if (!$this->isFileInDownloads($path)) {
+					$this->client->download($path, $this->localFile($path));
+				}
+
+				return $this->waitUntilDownloaded($path);
 			case 'w':
 			case 'wb':
 			case 'a':
@@ -320,10 +384,18 @@ class Sia extends \OC\Files\Storage\Common {
 			case 'x+':
 			case 'c':
 			case 'c+':
-				$localfile = $this->datadir . '/' . basename($path);
+				$localfile = $this->localFile($path);
 				$handle = fopen($localfile, $mode);
 				return CallbackWrapper::wrap($handle, null, null, function () use ($path, $localfile) {
 					$this->client->upload($path, $localfile);
+					while (true) {
+						$files = $this->client->renterFiles();
+						foreach ($files as $file) {
+							if ($file->siapath == $path) {
+								return;
+							}
+						}
+					}
 				});
 		}
 	}
