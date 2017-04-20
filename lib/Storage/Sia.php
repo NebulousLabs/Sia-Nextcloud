@@ -9,8 +9,8 @@
  * This code is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License, version 3,
  * as published by the Free Software Foundation.
- * This program is distributed in the hope that it will be useful,
  *
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
@@ -84,6 +84,9 @@ class Sia extends \OC\Files\Storage\Common {
 		return array_values($ret);
 	}
 
+	// localFile takes a $siapath and returns the location of the file on disk.
+	// Temporary files ('.octransfer*') will have the same hash as their final
+	// forms.
 	private function localFile($siapath) {
 		$cleanpath = $siapath;
 		if (strpos($siapath, '.ocTransferId') !== false) {
