@@ -6,8 +6,7 @@ This is the [Nextcloud](https://nextcloud.com/) Sia storage backend implementati
 
 * A `siad` instance must be running on the same system as the Nextcloud server.
   * The `siad` instance must be fully synchronized.
-  * The `siad` instance must have an allowance set.
-  * The `siad` instance must have at least one active rental contract.
+  * The `siad` instance must have a rental allowance set.
 
 ## Video Tutorial
 
