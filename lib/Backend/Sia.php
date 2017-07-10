@@ -37,8 +37,8 @@ class Sia extends Backend {
 			->setStorageClass(\OCA\Files_External_Sia\Storage\Sia::class)
 			->setText($l->t('Sia'))
 			->addParameters([
-				(new DefinitionParameter('apiaddr', $l->t('API Address'))),
-				(new DefinitionParameter('datadir', $l->t('Renter Data Directory'))),
+				(new DefinitionParameter('apiaddr', $l->t('API Address, usually "localhost:9980"'))),
+				(new DefinitionParameter('datadir', $l->t('Renter data directory, e.g. /tmp/sia-upload'))),
 			])
 			->setAllowedVisibility(BackendService::VISIBILITY_ADMIN)
 			->setPriority(BackendService::PRIORITY_DEFAULT + 50)

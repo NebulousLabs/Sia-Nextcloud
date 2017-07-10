@@ -4,7 +4,16 @@ This is the [Nextcloud](https://nextcloud.com/) Sia storage backend implementati
 
 ## Requirements
 
-This requires one parameter to work, an API Address. This API Address must point to a reachable, synchronized Sia node that has money set aside in an allowance.
+* A `siad` instance must be running on the same system as the Nextcloud server.
+  * The `siad` instance must be fully synchronized.
+  * The `siad` instance must have an allowance set.
+  * The `siad` instance must have at least one active rental contract.
 
+## Video Tutorial
 
+A slightly outdated video setup tutorial is available on YouTube:
+
+* [Integrating Sia, blockchain based storage, in Nextcloud](https://www.youtube.com/watch?v=Ut--X4u69vw)
+
+Note that the video is from a previous version of Sia-Nextcloud that did not require a "Renter data directory" parameter during configuration.
 
